@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+</head>
+
+<body>
+    <!-- <div id="result"></div> -->
+    <!-- <button onclick="downloadResult(results)">下载抽签结果</button> -->
+    <script src="lodash.js"></script>
+    <script src="vue.js"></script>
+    <script type="text/javascript">
+        /**
+         * 下载抽签结果
+         * 
+         */
+        function downloadResult(results) {
+            let csv_string = "面试批次编号,考官姓名,考官身份证号码,考官类型,标签\r\n";
+
+            for (let key in results) {
+                for (let item of results[key]) {
+                    csv_string += `${key},${item.name},'${item.idcard}',${item.type},${item.labels.join('|')}\r\n`;
+                }
+                csv_string += "\r\n";
+            }
+            saveCsv(csv_string, 'results.csv');
+        }
+        /**
+         * 
+         * 保存为csv文件格式
+         * 
+         */
+        function saveCsv(csv_string, filename) {
+            var link = document.createElement('a');
+            link.style.display = 'none';
+            link.setAttribute('target', '_blank');
+            link.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv_string));
+            link.setAttribute('download', filename);
+
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        /***
+         * 获取考官抽签规则
+         * 
+         */
+        async function getRules() {
+            const rule = await (await fetch('rule.csv')).text();
+
+            return getTable(rule.split('\r\n'));
+        }
+        /***
+         * 
+         * 获取考官
+         * 
+         */
+        async function getInspectors() {
+            const inspector = await (await fetch('inspector.csv')).text();
+
+            return getTable(inspector.split('\r\n'));
+        }
+        /***
+         * 
+         * 获取已指定考官
+         * 
+         */
+        async function getLotteryResult() {
+            const lotteryResult = await (await fetch('lotteryResult.csv')).text();
+
+            return getTable(lotteryResult.split('\r\n'));
+        }
+        /***
+         * 
+         * get table 
+         * 
+         * 
+         */
+        function getTable(sheet) {
+            if (!sheet || sheet.length == 0) return;
+
+            let headers = [];
+            let _headers = sheet.shift().split(",");
+            if (!_headers || _headers.length == 0) return;
+
+            _headers.forEach((item, index) => {
+                headers.push({
+                    index: index,
+                    name: item
+                });
+            });
+
+            let results = [];
+
+            while (sheet.length > 0) {
+                let rowData = sheet.shift().split(',');
+                if (!rowData || 0 == rowData.length) continue;
+
+                let result = {};
+                for (let header of headers) {
+                    try {
+                        result[header.name] = rowData[header.index];
+                    } catch {
+
+                    }
+                }
+
+                results.push(result);
+            }
+
+            return results;
+        }
+
+        // const rules = [];
+        // let inspectors = [];
+
+        // /**
+        //  * 指定抽签结果
+        //  */
+        // let alreadyResult = [];
+        // Promise.resolve()
+        //     .then(async () => getRules())
+        //     .then(result => {
+        //         let id = 0;
+        //         result.forEach(item => {
+        //             if (!item['面试批次编号']) return;
+
+        //             rules.push({
+        //                 id: id++,
+        //                 code: item['面试批次编号'],
+        //                 name: item['面试批次名称'],
+        //                 type: item['考官类型'],
+        //                 min: Number.parseInt(item['最小抽签数']) || 1,
+        //                 max: Number.parseInt(item['最大抽签数']) || 1,
+        //                 labels: item['标签'].split('|'),
+        //                 priority: Number.parseInt(item['优先级'])
+        //             });
+        //         });
+
+        //         console.log('加载的抽签规则', rules)
+        //     })
+        //     .then(async () => await getInspectors())
+        //     .then(result => {
+        //         result.forEach(item => {
+        //             if (!item['身份证号码']) return;
+
+        //             inspectors.push({
+        //                 name: item['姓名'],
+        //                 idcard: item['身份证号码'],
+        //                 type: item['类型'],
+        //                 labels: item['标签'].split('|')
+        //             });
+        //         });
+
+        //         console.log('加载的考官', inspectors);
+        //     })
+        //     .then(async () => await getLotteryResult())
+        //     .then(result => {
+        //         result.forEach(item => {
+        //             if (!item['身份证号码'] || !item['面试批次编码']) return;
+
+        //             alreadyResult.push({
+        //                 code: item['面试批次编码'],
+        //                 idcard: item['身份证号码']
+        //             });
+        //         });
+
+        //         console.log('已确定的抽签结果', alreadyResult);
+        //     })
+        //     .then(() => {
+        //         //lottery();
+        //     });
+
+        // /**
+        //  * 
+        //  * 加载指定的考官
+        //  */
+        // function loadAreadyResult(result, alreadyResult, actualInspectors) {
+        //     /***
+        //      * 分配已经指定的考官
+        //      * 
+        //      */
+        //     for (let item of alreadyResult) {
+        //         let inspector = _.first(actualInspectors.filter(p => p.idcard == item.idcard));
+
+        //         if (!inspector) continue;
+
+        //         result[item.code] = result[item.code] || [];
+        //         _.remove(actualInspectors, p => p.idcard == inspector.idcard);
+
+        //         result[item.code].push(inspector);
+        //     }
+
+        //     return result;
+        // }
+
+        // let results = {};
+        // /**
+        //  * 
+        //  * 抽签方法
+        //  * 
+        //  */
+        // function lottery() {
+        //     results = {};
+        //     /**
+        //      * 按面试规则标签数量排序
+        //      */
+        //     let groupCodes = _.uniqWith(rules.sort(() => Math.random() - 0.5).sort((rule) => rule.labels.length * rule.priority).map((rule) => rule.code));
+
+        //     let groupByRules = _.groupBy(rules, "code");
+        //     let groupByInspector = _.groupBy(inspectors, 'idcard');
+
+
+        //     let actualInspectors = [];
+        //     /**
+        //      * 考官去重
+        //      */
+        //     for (let key in groupByInspector) {
+        //         actualInspectors.push(_.first(groupByInspector[key]))
+        //     }
+
+        //     loadAreadyResult(results, alreadyResult, actualInspectors);
+
+        //     /**
+        //      * 1、先按照rule的code进行分组，并随机顺序
+        //      * 2、循环并按照优先级排序
+        //      * 3、将考官打乱
+        //      * 4、按照labels进行碰撞和数量进行碰撞.
+        //      */
+        //     for (let code of groupCodes) {
+        //         let actualRules = groupByRules[code].sort(() => Math.random() - 0.5).sort((a, b) => b.priority - a.priority);
+
+        //         /**
+        //          * 因为统一组里面存在相同的抽签规则，上下数据有关联，所以需要添加累加器
+        //          */
+        //         let limit = {};
+        //         for (let rule of actualRules) {
+        //             limit[rule.type] = limit[rule.type] || {
+        //                 min: 0,
+        //                 max: 0
+        //             };
+
+        //             limit[rule.type].min += rule.min;
+        //             limit[rule.type].max += rule.max;
+
+        //             distribute(code, rule, results, actualInspectors, limit[rule.type]);
+        //         }
+        //     }
+
+        //     console.log("最终抽签结果:", results);
+
+        //     let string = "";
+
+        //     for (let key in results) {
+        //         string += `
+        //             <div>
+        //                 <p>面试批次编号:${key}</p>
+        //                 <p>结果:${results[key].map(p => `${p.name}(${p.type})`)}
+        //             </div>
+        //             <br/>
+        //         `;
+        //     }
+
+        //     document.querySelector('#result').innerHTML = string;
+        // }
+        // /**
+        //  * 分配考官
+        //  */
+        // function distribute(code, rule, results, actualInspectors, limit) {
+        //     results[code] = results[code] || [];
+        //     /**
+        //      * 判断指定的结果是否抽取满足
+        //      * 
+        //      */
+        //     if (results[code].filter(p => p.type == rule.type).length >= limit.max) return;
+
+        //     let randomInspectors = actualInspectors.sort(() => Math.random() - 0.5).filter(p => p.type == rule.type);
+
+        //     for (let inspector of randomInspectors) {
+        //         try {
+        //             if (!rule.labels || !inspector.labels) continue;
+
+        //             if (rule.labels == inspector.labels) {
+        //                 _.remove(actualInspectors, p => p.idcard == inspector.idcard);
+        //                 results[code].push(inspector);
+
+        //                 continue;
+        //             }
+
+        //             /**
+        //              * 考官必须满足所有的面试批次的标签才能选为考官
+        //              */
+        //             let fail = false;
+        //             for (let index = 0; index < rule.labels.length; index++) {
+        //                 if (inspector.labels.indexOf(rule.labels[index]) < 0) {
+        //                     fail = true;
+
+        //                     break;
+        //                 }
+        //             }
+
+        //             if (!fail) {
+        //                 _.remove(actualInspectors, p => p.idcard == inspector.idcard);
+        //                 results[code].push(inspector);
+        //             }
+        //         } finally {
+        //             /**
+        //              * 判断是否抽取完成
+        //              */
+
+        //             if (results[code].filter(p => p.type == rule.type).length >= limit.max) break;
+        //         }
+        //     }
+
+        //     if (results[code].filter(p => p.type == rule.type).length < limit.min) {
+        //         alert('抽签失败');
+        //         return;
+        //     }
+        // }
+    </script>
+    <style>
+        .float6 {
+            float: initial;
+            /* background-color: blue; */
+        }
+
+        li {
+            font-family: "楷体";
+            font-size: 20px;
+            float: left;
+            list-style: none;
+        }
+        .le{
+            font-family: "楷体";
+            font-size: 20px;
+            float: left;
+            list-style: none;
+        }
+    </style>
+    <div id="result" class="float6">
+        <h2>抽抽抽</h2>
+        <div v-if='loading'>加载数据中</div>
+        <div v-else>已加载完成(规则:{{getedRules.length}},考官:{{getedInspectors.length}},已匹配:{{getedLotteryResults.length}}</div>
+        <button @click="showInfo(66,$event)">开始抽签(测试)</button>
+        <button @click="showInfo2()">停止抽签(测试)</button>
+        <div id="resources"></div>
+        <br>
+        <ul>
+            <li v-for="(value,i,index6) in teacherResultObj">
+                面试批次编号:{{i}}<br>
+                {{value[0].type}}:{{value[0].name}}
+                <br>
+                    <ul class = "le" v-for="(value2,name2,i2) in value">
+                    <li v-if = "value2.type ==='普通考官'">
+                        {{value2.type}}:{{value2.name}},
+                    </li>
+                </ul>
+            </li>
+
+        </ul>
+    </div>
+    <!-- <div>
+            <span>主考官</span>
+        </div>
+        <hr>
+        <div>
+            <span>data:{{starname}}</span>
+        </div>
+        <br>
+        <div >
+            <span>普通考官</span>
+        </div>
+        <hr>
+        <div>
+            <span>data:{{name1}}</span>
+        </div>
+        <br>
+<div>
+    <div>
+        <span>普通考官</span>
+    </div>
+    <hr>
+    <div>
+        <span>data{{name2}}</span>
+    </div>
+    <br>
+    <div>
+        <span>普通考官</span>
+    </div>
+    <hr>
+    <div>
+        <span>data{{name3}}</span>
+    </div>
+    <br>
+    <div>
+        <span>普通考官</span>
+    </div>
+    <hr>
+    <div>
+        <span>data{{name4}}</span>
+    </div>
+</div> -->
+    <script type="text/javascript">
+        Vue.config.productionTip = false //阻止生产提示
+        const rules = [];
+        let book = 10;
+        let inspectors = [];
+        let actualInspectors = [];
+        let string = "";
+        let timer = 0;
+        let string2 = `<h2>抽抽抽</h2>
+        <button @click="showInfo(66,$event)">开始抽签(传参测试)</button>
+        <button @click="showInfo2()">停止抽签(传参测试)</button>
+        <br><br>`;
+        let string3 = `
+        <button onclick="downloadResult(results)">下载抽签结果</button>`;
+        /**
+         * 指定抽签结果
+         */
+        let alreadyResult = [];
+        // Promise.resolve()
+        //     .then(async () => getRules())
+        //     .then(result => {
+        //         let id = 0;
+        //         result.forEach(item => {
+        //             if (!item['面试批次编号']) return;
+
+        //             rules.push({
+        //                 id: id++,
+        //                 code: item['面试批次编号'],
+        //                 name: item['面试批次名称'],
+        //                 type: item['考官类型'],
+        //                 min: Number.parseInt(item['最小抽签数']) || 1,
+        //                 max: Number.parseInt(item['最大抽签数']) || 1,
+        //                 labels: item['标签'].split('|'),
+        //                 priority: Number.parseInt(item['优先级'])
+        //             });
+        //         });
+
+        //         console.log('加载的抽签规则', rules)
+        //     })
+        //     .then(async () => await getInspectors())
+        //     .then(result => {
+        //         result.forEach(item => {
+        //             if (!item['身份证号码']) return;
+
+        //             inspectors.push({
+        //                 name: item['姓名'],
+        //                 idcard: item['身份证号码'],
+        //                 type: item['类型'],
+        //                 labels: item['标签'].split('|')
+        //             });
+        //         });
+
+        //         console.log('加载的考官', inspectors);
+        //     })
+        //     .then(async () => await getLotteryResult())
+        //     .then(result => {
+        //         result.forEach(item => {
+        //             if (!item['身份证号码'] || !item['面试批次编码']) return;
+
+        //             alreadyResult.push({
+        //                 code: item['面试批次编码'],
+        //                 idcard: item['身份证号码']
+        //             });
+        //         });
+        //         console.log('已确定的抽签结果', alreadyResult);
+        //     })
+        //     .then(() => {
+        //         vm.lottery();
+        //     });
+        const vm = new Vue({
+            el: '#result',
+            data: {
+                teacherResultObj: '',
+                loading: false,
+                getedRules: [],
+                getedInspectors: [],
+                getedLotteryResults: []
+            },
+            async created() {
+                await this.init();
+            },
+            mounted() {
+            },
+            updated() {
+                console.log(this);
+            },
+            methods: {
+
+                /**
+                 * 初始化以及加载数据
+                 * 在生命周期函数created中使用methods里面的init()方法
+                 * 
+                 * */
+                async init() {
+                    if (this.loading) return;
+
+                    this.loading = true;
+                    try {
+                        this.getedRules = await getRules();
+                        console.log("rules就绪",this.loadRules);
+                        this.getedInspectors = await getInspectors();
+                        console.log("inspectors就绪",this.loadInspectors);
+                        this.getedLotteryResults = await getLotteryResult();
+                        console.log("lotteryResults就绪",this.loadLotteryResults);
+                        this.loadingInspectors();
+                        this.loadingResults();
+                        this.loadingRules();
+                    }
+                    catch (e) {
+                        console.error(e);
+
+                        alert(`加载数据错误：${e.message}`);
+                    }
+                    finally {
+                        this.loading = false;
+                    }
+                },
+
+                /**
+                 * 
+                 * 把加载好的考官以及规则放进指定的容器
+                 * inspectors.push
+                 * rules.push
+                 * results.push
+                 * 
+                 * 
+                 * */
+                loadingInspectors(){
+                this.getedInspectors.forEach(item => {
+                    if (!item['身份证号码']) return;
+
+                    inspectors.push({
+                        name: item['姓名'],
+                        idcard: item['身份证号码'],
+                        type: item['类型'],
+                        labels: item['标签'].split('|')
+                    });
+                });
+
+                console.log('加载的考官', inspectors);
+                },
+                loadingRules(){
+                let id = 0;
+                this.getedRules.forEach(item => {
+                    if (!item['面试批次编号']) return;
+
+                    rules.push({
+                        id: id++,
+                        code: item['面试批次编号'],
+                        name: item['面试批次名称'],
+                        type: item['考官类型'],
+                        min: Number.parseInt(item['最小抽签数']) || 1,
+                        max: Number.parseInt(item['最大抽签数']) || 1,
+                        labels: item['标签'].split('|'),
+                        priority: Number.parseInt(item['优先级'])
+                    });
+                });
+
+                console.log('加载的抽签规则', rules)
+        },
+                loadingResults(){
+                this.getedLotteryResults.forEach(item => {
+                    if (!item['身份证号码'] || !item['面试批次编码']) return;
+
+                    alreadyResult.push({
+                        code: item['面试批次编码'],
+                        idcard: item['身份证号码']
+                    });
+                });
+                console.log('已确定的抽签结果', alreadyResult);
+                },
+
+
+                /**
+                 * 
+                 * 加载指定的考官
+                 */
+                loadAreadyResult(result, alreadyResult, actualInspectors) {
+                    /***
+                     * 分配已经指定的考官
+                     * 
+                     */
+                    for (let item of alreadyResult) {
+                        let inspector = _.first(actualInspectors.filter(p => p.idcard == item.idcard));
+
+                        if (!inspector) continue;
+
+                        result[item.code] = result[item.code] || [];
+                        _.remove(actualInspectors, p => p.idcard == inspector.idcard);
+
+                        result[item.code].push(inspector);
+                    }
+
+                    return result;
+                },
+
+
+                /**
+                 * 分配考官
+                 */
+
+                distribute(code, rule, results, actualInspectors, limit) {
+                    results[code] = results[code] || [];
+                    /**
+                     * 判断指定的结果是否抽取满足
+                     * 
+                     */
+                    if (results[code].filter(p => p.type == rule.type).length >= limit.max) return;
+
+                    let randomInspectors = actualInspectors.sort(() => Math.random() - 0.5).filter(p => p.type == rule.type);
+
+                    for (let inspector of randomInspectors) {
+                        try {
+                            if (!rule.labels || !inspector.labels) continue;
+
+                            if (rule.labels == inspector.labels) {
+                                _.remove(actualInspectors, p => p.idcard == inspector.idcard);
+                                results[code].push(inspector);
+
+                                continue;
+                            }
+
+                            /**
+                             * 考官必须满足所有的面试批次的标签才能选为考官
+                             */
+                            let fail = false;
+                            for (let index = 0; index < rule.labels.length; index++) {
+                                if (inspector.labels.indexOf(rule.labels[index]) < 0) {
+                                    fail = true;
+
+                                    break;
+                                }
+                            }
+
+                            if (!fail) {
+                                _.remove(actualInspectors, p => p.idcard == inspector.idcard);
+                                results[code].push(inspector);
+                            }
+                        } finally {
+                            /**
+                             * 判断是否抽取完成
+                             */
+
+                            if (results[code].filter(p => p.type == rule.type).length >= limit.max) break;
+                        }
+                    }
+
+                    if (results[code].filter(p => p.type == rule.type).length < limit.min) {
+                        alert('抽签失败');
+                        return;
+                    }
+                },
+                /**
+                 * 
+                 * 抽签方法
+                 * 
+                 */
+                lottery() {
+                    results = {};
+                    /**
+                     * 按面试规则标签数量排序
+                     */
+                    let groupCodes = _.uniqWith(rules.sort(() => Math.random() - 0.5).sort((rule) => rule.labels.length * rule.priority).map((rule) => rule.code));
+                    let groupByRules = _.groupBy(rules, "code");
+                    let groupByInspector = _.groupBy(inspectors, 'idcard');
+                    let actualInspectors = [];
+                    /**
+                     * 考官去重
+                     */
+                    for (let key in groupByInspector) {
+                        actualInspectors.push(_.first(groupByInspector[key]))
+                    }
+
+                    this.loadAreadyResult(results, alreadyResult, actualInspectors);
+
+                    /**
+                     * 1、先按照rule的code进行分组，并随机顺序
+                     * 2、循环并按照优先级排序
+                     * 3、将考官打乱
+                     * 4、按照labels进行碰撞和数量进行碰撞.
+                     */
+                    for (let code of groupCodes) {
+                        let actualRules = groupByRules[code].sort(() => Math.random() - 0.5).sort((a, b) => b.priority - a.priority);
+
+                        /**
+                         * 因为统一组里面存在相同的抽签规则，上下数据有关联，所以需要添加累加器
+                         */
+                        let limit = {};
+                        for (let rule of actualRules) {
+                            limit[rule.type] = limit[rule.type] || {
+                                min: 0,
+                                max: 0
+                            };
+
+                            limit[rule.type].min += rule.min;
+                            limit[rule.type].max += rule.max;
+
+                            this.distribute(code, rule, results, actualInspectors, limit[rule.type]);
+                        }
+                    }
+
+                    console.log("最终抽签结果:", results);
+                    console.log("meiyige", results[1]);
+                    let temp = [];
+                    console.log("检查考官type", results[1][1].type);
+                    for (var index2 = 1; index2 <= Object.keys(results).length; index2++) {
+                        for (var index = 0; index < 7; index++) {
+                            if (results[index2][index].type == '主考官' && index !== 0) {
+                                temp = results[index2][0];
+                                results[index2][0] = results[index2][index];
+                                results[index2][index] = temp;
+                                break;
+                            }
+
+                        }
+                    }
+                    // for (let key in results) {
+                    //     string += `
+                    //         <div>
+                    //             <div>面试批次编号:${key}</div>
+                    //             <p>${results[key].map(p => `${p.name}(${p.type})`)}
+                    //         </div>
+                    //         <br/>
+                    //     `;
+                    // }
+                },
+
+                /**
+                 * 1.v4.0：利用递归和timeout方法，基本实现了加载数据并使其滚动
+                 * 2.解决了3.0的问题，应用了vue中data:{   }即时改变的特性
+                 * 3.采用列表v-for嵌套循环，实现了精准打印每一个试室的考官
+                 * 4.前端优化
+                 * */
+
+
+                /**
+                * 开始抽签对应的< 点击事件 >
+                * 点击即开始随机抽签并在页面上显示内容，达到滚动的目的
+                * 通过对标记变量book的累加以及判断达到循环或终止的目的
+                * 当book为负数时，打印最后得到的抽签结果在页面上。
+                * 
+                * */
+                showInfo() {
+                    timer = setTimeout(() => {
+                        console.log("抽签结果", string);
+                        console.log("book标记显示", book);
+                        if (book >= 0) {
+                            // if(book!= -10)
+                            //     string = [];
+                            this.lottery();
+                            this.teacherResultObj = results;
+                            // document.querySelector('#resources').innerHTML = string;
+                            book++;
+                            this.showInfo();
+                        }
+                        else if (book < 0) {
+                            //再次确认是否继续抽签
+                            //不抽签则清除计时器，打印一个按钮用于下载抽签结果
+                            if (!confirm("是否继续抽签？")) {
+                                clearTimeout(timer);
+                                document.querySelector('#resources').innerHTML = string3;
+                                return;
+                            }
+                            //继续抽签，则重新把标志变量book置为10
+                            //让页面的数据继续滚动
+                            else {
+                                book = 10;
+                                // this.showInfo();
+                            }
+                        }
+                        // else {
+                        // return;
+                        // }
+                    }, 188)
+                },
+
+                /**
+                 * 结束抽签对应的< 点击事件 >
+                 * 把标记变量book置为负数来达到停止循环的目的
+                 * 然后回调showInfo，在页面上显示抽签的结果
+                 * 并显示另外一个按钮（下载抽签结果）
+                 * 
+                 * */
+                showInfo2() {
+                    book = -10;
+                    this.showInfo();
+                }
+
+
+                // /**
+                //  * 1.v3.0：利用递归和timeout方法，基本实现了加载数据并使其滚动
+                //  * 2.解决了2.0的问题，但是未应用vue中data:{   }即时改变的特性
+                //  * 3.对于循环打印的数据，美化界面略微有些困难
+                //  * 4.解决：想办法把results里面的数据放到一个静态页面上，然后通过vue美化静态界面
+                //  * */
+
+                // /**
+                //  * 开始抽签对应的< 点击事件 >
+                //  * 点击即开始随机抽签并在页面上显示内容，达到滚动的目的
+                //  * 通过对标记变量book的累加以及判断达到循环或终止的目的
+                //  * 当book为负数时，打印最后得到的抽签结果在页面上。
+                //  * 
+                //  * */
+                // showInfo(){
+                //     timer = setTimeout(()=>{
+                //     console.log("抽签结果",string);
+                //     console.log("book标记显示",book)
+                //     if(book >= 0){
+                //         if(book!= -10)
+                //             string = [];
+                //         this.lottery();
+                //         document.querySelector('#resources').innerHTML = string;
+                //         book++;
+                //         this.showInfo();
+                //     }
+                //     else if(book<0){
+                //         if(!confirm("是否继续抽签？")){
+                //         clearTimeout(timer);
+                //         document.querySelector('#resources').innerHTML = string3+string;
+                //         return;
+                //         }
+                //         else{
+                //         book = 10;
+                //         this.showInfo(); 
+                //         }
+                //     }
+                //     // else {
+                //     // return;
+                //     // }
+                //     },100)
+                // },
+
+                // /**
+                //  * 结束抽签对应的< 点击事件 >
+                //  * 把标记变量book置为负数来达到停止循环的目的
+                //  * 然后回调showInfo，在页面上显示抽签的结果
+                //  * 并显示另外一个按钮（下载抽签结果）
+                //  * 
+                //  * */
+                //  showInfo2(){
+                //     book = -10;
+                //     this.showInfo();
+                // }
+
+
+
+
+
+                // /**
+                //  * 1.v-2.0：利用递归和timeout方法，基本实现了加载数据并使其滚动
+                //  * 2.inner循环打印页面，造成了按钮无法使用
+                //  * 3.问题：滚动时按钮无法触发
+                //  * 4.解决：想办法让按钮及其相关html做成静态，只有数据滚动
+                //  * */
+                // showInfo2(){
+                //     book = 30;
+                //     this.showInfo();
+                // },
+                // showInfo(){
+                //     timer = setTimeout(()=>{
+                //     console.log("抽签结果",string);
+                //     console.log("book标记显示",book)
+                //     if(book >= 0&&book<30){
+                //         this.lottery();
+                //         document.querySelector('#result').innerHTML = string2+string;
+                //         if(book!= 29)
+                //             string = [];
+                //         book++;
+                //         this.showInfo();
+                //     }
+                //     else if(book>=30){
+                //         if(confirm("是否希望抽签结束？")){
+                //         clearTimeout(timer);
+                //         document.querySelector('#result').innerHTML = string3+string;
+                //         return;
+                //         }
+                //         else{
+                //         book = 10;
+                //         this.showInfo(); 
+                //         }
+                //     }
+                //     // else {
+                //     // return;
+                //     // }
+                //     },100)
+                // }
+
+
+
+                /**v-1.0
+                * 开始抽签，初始思路是根据时间的变化，每隔一个时间单位变换一次span中的内容
+                * 即每隔一个时间单位从csv中获取考官信息
+                * 然后使用不同的vue实例分别改变主考官与普通考官的名字
+                * 
+                * resources()
+                * 使用timeout，每间隔一个时间点改变一次data中的内容
+                * 这个方法是只筛选主考官的
+                * 
+                * */
+            },
+        })
+    </script>
+</body>
+
+</html>
