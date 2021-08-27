@@ -1,0 +1,20 @@
+(1)对于webpack.config.js报错
+
+//
+Error [ERR_REQUIRE_ESM]: Must use import to load ES Module: D:\vue_trying_testing\wcm\webpack.config.js
+require() of ES modules is not supported.
+require() of D:\vue_trying_testing\wcm\webpack.config.js from D:\vue_trying_testing\wcm\node_modules\webpack-cli\lib\groups\resolveConfig.js is an ES module file as it is a .js file whose nearest parent package.json contains "type": "module" which defines all .js files in that package scope as ES modules.
+Instead rename webpack.config.js to end in .cjs, change the requiring code to use import(), or remove "type": "module" from D:\vue_trying_testing\wcm\package.json.
+//
+
+我先是把const path = require('path') 变为const path = import('path');但是还是报错
+
+//
+Error [ERR_REQUIRE_ESM]: Must use import to load ES Module: D:\vue_trying_testing\wcm\webpack.config.js
+require() of ES modules is not supported.
+require() of D:\vue_trying_testing\wcm\webpack.config.js from D:\vue_trying_testing\wcm\node_modules\webpack-cli\lib\groups\resolveConfig.js is an ES module file as it is a .js file whose nearest parent package.json contains "type": "module" which defines all .js files in that package scope as ES modules.
+Instead rename webpack.config.js to end in .cjs, change the requiring code to use import(), or remove "type": "module" from D:\vue_trying_testing\wcm\package.json.
+//
+
+最后我根据提示，把webpack.config.js后缀名改为了webpack.config.cjs之后
+才打包成功
